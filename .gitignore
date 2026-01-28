@@ -1,0 +1,37 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ---- Virtual Environment ----
+venv/
+env/
+.venv/
+
+# ---- Environment Files ----
+*.env
+api.env
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+*.log
+
+# ---- PDF / Temporary Files ----
+*.pdf
+temp.pdf
+
+# ---- IDE Folders ----
+.vscode/
+.idea/
+
+# ---- Python Packages / Cache ----
+*.egg-info/
+.eggs/
+
+# ---- Local Files You Don’t Want on GitHub ----
+/uploads/
+.cache/

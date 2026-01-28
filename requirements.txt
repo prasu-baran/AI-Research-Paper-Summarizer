@@ -1,0 +1,4 @@
+camel-ai
+python-dotenv
+pdfplumber
+streamlit
