@@ -2,6 +2,7 @@
 import os
 from dotenv import load_dotenv
 import pdfplumber
+import streamlit as st
 
 from camel.models import ModelFactory
 from camel.types import ModelPlatformType
@@ -45,6 +46,7 @@ research_agent = ChatAgent(
 
 
 # ------------------ PDF TEXT EXTRACTION FUNCTION ------------------
+@st.cache_data(show_spinner=False)
 def extract_pdf_text(pdf_path: str) -> str:
     """Extracts text from a PDF safely using pdfplumber."""
     text = ""
@@ -55,36 +57,52 @@ def extract_pdf_text(pdf_path: str) -> str:
                 text += page_text + "\n"
     return text
 
+def summarize_chunk(chunk: str) -> str:
+    """Summarizes a single chunk of text."""
+    prompt = f"""
+    Summarize the following section of a research paper.
+    Focus on key ideas, methods, and findings.
+    Keep it concise and factual.
+
+    TEXT:
+    {chunk}
+    """
+    response = research_agent.step(prompt)
+    return response.msgs[0].content
+
+
+def chunk_text(text: str, max_words: int = 1200) -> list:
+    """Splits text into word-based chunks."""
+    words = text.split()
+    chunks = []
+
+    for i in range(0, len(words), max_words):
+        chunk = " ".join(words[i:i + max_words])
+        chunks.append(chunk)
+
+    return chunks
+
 
 # ------------------ RESEARCH PAPER SUMMARY FUNCTION ------------------
 def summarize_paper(text: str) -> dict:
-    """Produces structured academic summary output."""
-    
     if not text or len(text.strip()) == 0:
         return {"error": "No extractable text found in the PDF."}
 
-    prompt = f"""
-    You are an AI research paper summarization assistant.
+    chunks = chunk_text(text)
 
-    Perform these tasks in a clean academic format:
+    chunk_summaries = []
+    for chunk in chunks:
+        summary = summarize_chunk(chunk)
+        chunk_summaries.append(summary)
 
-    ### ABSTRACT-LEVEL SUMMARY
-    - Provide a concise abstract-like summary (6–8 sentences).
+    combined_summary = "\n".join(chunk_summaries)
 
-    ### 10 KEY POINTS
-    - Provide exactly 10 bullet points covering objectives, methods, results, implications.
+    final_prompt = f"""
+    You are an expert research paper analysis assistant.
 
-    ### KEYWORDS
-    - Extract 8–12 important technical keywords.
+    Using the summarized sections below, produce a final structured academic summary.
 
-    ### TECHNICAL DIFFICULTY (1–10)
-    - Rate the difficulty based on mathematical complexity, domain expertise required, and technical vocabulary.
-
-    ### SENTIMENT
-    - Identify sentiment: neutral, critical, or positive.
-    - Include 1 sentence explaining why.
-
-    The output must STRICTLY follow this formatting:
+    STRICTLY follow this format:
 
     ABSTRACT-LEVEL SUMMARY:
     <paragraph>
@@ -105,9 +123,9 @@ def summarize_paper(text: str) -> dict:
     <justification>
 
     ---------------------
-    Paper Content:
-    {text}
+    Summarized Content:
+    {combined_summary}
     """
 
-    response = research_agent.step(prompt)
+    response = research_agent.step(final_prompt)
     return {"result": response.msgs[0].content}

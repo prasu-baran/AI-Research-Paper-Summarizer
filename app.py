@@ -2,8 +2,9 @@
 import streamlit as st
 import os
 import base64
-from datetime import datetime
+import tempfile
 
+from datetime import datetime
 from agent import extract_pdf_text, summarize_paper
 
 # Page configuration
@@ -189,8 +190,10 @@ with col_right:
 # Process the uploaded file
 if uploaded_file:
     # Save file temporarily
-    with open("temp.pdf", "wb") as f:
-        f.write(uploaded_file.read())
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        temp_pdf_path = tmp_file.name
+
     
     # File info
     file_size = uploaded_file.size / (1024 * 1024)  # Convert to MB
@@ -203,7 +206,8 @@ if uploaded_file:
         if st.button("🚀 Generate Summary", use_container_width=True):
             # Process the PDF
             with st.spinner("🔍 Extracting text from PDF..."):
-                text = extract_pdf_text("temp.pdf")
+                text = extract_pdf_text(temp_pdf_path)
+
             
             if text.strip() == "":
                 st.error("""
