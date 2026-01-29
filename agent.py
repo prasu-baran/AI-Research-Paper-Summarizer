@@ -127,5 +127,11 @@ def summarize_paper(text: str) -> dict:
     {combined_summary}
     """
 
-    response = research_agent.step(final_prompt)
-    return {"result": response.msgs[0].content}
+    try:
+        response = research_agent.step(final_prompt)
+        return {"result": response.msgs[0].content}
+    except Exception as e:
+        return {
+            "error": "The AI model failed to generate a summary. Please try again."
+        }
+        return {"result": response.msgs[0].content}

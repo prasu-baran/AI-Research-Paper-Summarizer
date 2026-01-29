@@ -15,6 +15,71 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def parse_summary(text: str) -> dict:
+    sections = {
+        "abstract": "",
+        "key_points": [],
+        "keywords": [],
+        "difficulty": "",
+        "sentiment": ""
+    }
+
+    current_section = None
+
+    for line in text.splitlines():
+        line = line.strip()
+
+        if line.startswith("ABSTRACT-LEVEL SUMMARY"):
+            current_section = "abstract"
+            continue
+        elif line.startswith("10 KEY POINTS"):
+            current_section = "key_points"
+            continue
+        elif line.startswith("KEYWORDS"):
+            current_section = "keywords"
+            continue
+        elif line.startswith("TECHNICAL DIFFICULTY"):
+            current_section = "difficulty"
+            continue
+        elif line.startswith("SENTIMENT"):
+            current_section = "sentiment"
+            continue
+
+        if not line:
+            continue
+
+        if current_section == "key_points" and line.startswith("-"):
+            sections["key_points"].append(line[1:].strip())
+        elif current_section == "keywords" and line.startswith("-"):
+            sections["keywords"].append(line[1:].strip())
+        elif current_section:
+            sections[current_section] += line + " "
+
+    return sections
+
+
+def build_download_text(parsed: dict) -> str:
+    text = []
+
+    text.append("ABSTRACT-LEVEL SUMMARY:\n")
+    text.append(parsed["abstract"].strip() + "\n\n")
+
+    text.append("10 KEY POINTS:\n")
+    for i, point in enumerate(parsed["key_points"], 1):
+        text.append(f"{i}. {point}")
+    text.append("\n")
+
+    text.append("KEYWORDS:\n")
+    text.append(", ".join(parsed["keywords"]) + "\n\n")
+
+    text.append("TECHNICAL DIFFICULTY:\n")
+    text.append(parsed["difficulty"].strip() + "\n\n")
+
+    text.append("SENTIMENT:\n")
+    text.append(parsed["sentiment"].strip() + "\n")
+
+    return "\n".join(text)
+
 # Custom CSS for professional styling
 st.markdown("""
 <style>
@@ -229,18 +294,23 @@ if uploaded_file:
                 status_text = st.empty()
                 
                 # Simulate progress steps
-                for i in range(3):
-                    progress_bar.progress((i + 1) * 25)
-                    status_text.text(f"Processing... Step {i + 1}/4")
-                
+                progress_bar.progress(30)
+                status_text.text("Processing paper sections...")
+   
                 with st.spinner("🧠 Analyzing content and generating summary..."):
                     output = summarize_paper(text)
+                
+                os.remove(temp_pdf_path)
                 
                 progress_bar.progress(100)
                 status_text.text("✅ Analysis complete!")
                 
                 if "error" in output:
                     st.error(f"**Summarization Error:** {output['error']}")
+                    if st.button("🔁 Retry Summarization"):
+                        with st.spinner("Retrying summarization..."):
+                            output = summarize_paper(text)
+                        st.experimental_rerun()
                 else:
                     # Display results in a nicely formatted box
                     st.markdown("<div class='result-box'>", unsafe_allow_html=True)
@@ -248,7 +318,38 @@ if uploaded_file:
                     
                     # Add some spacing and formatting
                     st.markdown("---")
-                    st.markdown(output["result"])
+                    parsed = parse_summary(output["result"])
+                    if not parsed["abstract"]:
+                        st.error(
+                            "⚠️ The summary output was incomplete. "
+                            "This can happen with very short or malformed papers."
+                        )
+                        st.stop()
+
+                    
+                    download_text = build_download_text(parsed)
+
+                    st.subheader("📄 Abstract-Level Summary")
+                    st.write(parsed["abstract"])
+
+                    st.subheader("🔑 Key Points")
+                    for i, point in enumerate(parsed["key_points"], 1):
+                        st.markdown(f"**{i}.** {point}")
+
+                    st.subheader("🏷️ Keywords")
+                    st.write(", ".join(parsed["keywords"]))
+
+                    st.subheader("📊 Technical Difficulty")
+                    try:
+                        difficulty = int(parsed["difficulty"].strip())
+                        st.progress(difficulty / 10)
+                        st.write(f"Difficulty Level: **{difficulty}/10**")
+                    except:
+                        st.write(parsed["difficulty"])
+
+                    st.subheader("💬 Sentiment")
+                    st.write(parsed["sentiment"])
+
                     st.markdown("</div>", unsafe_allow_html=True)
                     
                     # Success message
@@ -258,7 +359,12 @@ if uploaded_file:
                     col_dl1, col_dl2, col_dl3 = st.columns([1, 2, 1])
                     with col_dl2:
                         st.markdown("---")
-                        st.info("💡 **Tip:** You can copy the summary above or take a screenshot for your records.")
+                        st.download_button(
+                            label="📥 Download Summary (.txt)",
+                            data=download_text,
+                            file_name="research_paper_summary.txt",
+                            mime="text/plain"
+                      )
 
 # Additional empty state content
 else:
